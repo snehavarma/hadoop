@@ -43,6 +43,11 @@ public final class AbfsHttpConstants {
   public static final String APPEND_BLOB_TYPE = "appendblob";
   public static final String TOKEN_VERSION = "2";
 
+  public static final String RELEASE = "release";
+  public static final String ACQUIRE = "acquire";
+  public static final String AUTO_RENEW = "auto-renew";
+
+
   public static final String JAVA_VENDOR = "java.vendor";
   public static final String JAVA_VERSION = "java.version";
   public static final String OS_NAME = "os.name";

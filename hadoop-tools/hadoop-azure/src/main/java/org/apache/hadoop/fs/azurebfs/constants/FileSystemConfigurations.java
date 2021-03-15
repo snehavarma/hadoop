@@ -84,6 +84,9 @@ public final class FileSystemConfigurations {
   public static final boolean DEFAULT_DISABLE_OUTPUTSTREAM_FLUSH = true;
   public static final boolean DEFAULT_ENABLE_AUTOTHROTTLING = true;
 
+  public static final boolean DEFAULT_FS_AZURE_WRITE_ENFORCE_LEASE = false;
+  public static final int DEFAULT_FS_AZURE_WRITE_LEASE_DURATION = 60;
+
   public static final DelegatingSSLSocketFactory.SSLChannelMode DEFAULT_FS_AZURE_SSL_CHANNEL_MODE
       = DelegatingSSLSocketFactory.SSLChannelMode.Default;
 

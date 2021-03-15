@@ -195,6 +195,15 @@ public class AbfsConfiguration{
       DefaultValue = DEFAULT_FS_AZURE_ATOMIC_RENAME_DIRECTORIES)
   private String azureAtomicDirs;
 
+  @BooleanConfigurationValidatorAnnotation(ConfigurationKey = FS_AZURE_WRITE_ENFORCE_LEASE,
+      DefaultValue = DEFAULT_FS_AZURE_WRITE_ENFORCE_LEASE)
+  private boolean azureWriteEnforceLease;
+
+  @IntegerConfigurationValidatorAnnotation(ConfigurationKey = FS_AZURE_WRITE_LEASE_DURATION,
+      MinValue = -1,
+      DefaultValue = DEFAULT_FS_AZURE_WRITE_LEASE_DURATION)
+  private int azureWriteLeaseDuration;
+
   @BooleanConfigurationValidatorAnnotation(ConfigurationKey = FS_AZURE_ENABLE_CONDITIONAL_CREATE_OVERWRITE,
       DefaultValue = DEFAULT_FS_AZURE_ENABLE_CONDITIONAL_CREATE_OVERWRITE)
   private boolean enableConditionalCreateOverwrite;
@@ -657,6 +666,14 @@ public class AbfsConfiguration{
 
   public boolean isAutoThrottlingEnabled() {
     return this.enableAutoThrottling;
+  }
+
+  public boolean isLeaseEnforced() {
+    return this.azureWriteEnforceLease;
+  }
+
+  public int getWriteLeaseDuration() {
+    return this.azureWriteLeaseDuration;
   }
 
   public String getCustomUserAgentPrefix() {

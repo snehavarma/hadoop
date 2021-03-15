@@ -30,6 +30,7 @@ import org.apache.hadoop.fs.azurebfs.AbfsConfiguration;
 import org.apache.hadoop.fs.azurebfs.contracts.services.AppendRequestParameters;
 import org.apache.hadoop.conf.Configuration;
 
+import static org.apache.hadoop.fs.azurebfs.contracts.services.AppendRequestParameters.LeaseMode.NONE;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.refEq;
 import static org.mockito.Mockito.mock;
@@ -86,7 +87,7 @@ public final class TestAbfsOutputStream {
     AbfsPerfTracker tracker = new AbfsPerfTracker("test", accountName1, abfsConf);
     when(client.getAbfsPerfTracker()).thenReturn(tracker);
     when(client.append(anyString(), any(byte[].class), any(AppendRequestParameters.class), any())).thenReturn(op);
-    when(client.flush(anyString(), anyLong(), anyBoolean(), anyBoolean(), any())).thenReturn(op);
+    when(client.flush(anyString(), anyLong(), anyBoolean(), anyBoolean(), any(), any())).thenReturn(op);
 
     AbfsOutputStream out = new AbfsOutputStream(client, null, PATH, 0,
         populateAbfsOutputStreamContext(BUFFER_SIZE, true, false, false));
@@ -104,9 +105,9 @@ public final class TestAbfsOutputStream {
     out.hsync();
 
     AppendRequestParameters firstReqParameters = new AppendRequestParameters(
-        0, 0, WRITE_SIZE, APPEND_MODE, false);
+        0, 0, WRITE_SIZE, APPEND_MODE, NONE, null, false);
     AppendRequestParameters secondReqParameters = new AppendRequestParameters(
-        WRITE_SIZE, 0, 2 * WRITE_SIZE, APPEND_MODE, false);
+        WRITE_SIZE, 0, 2 * WRITE_SIZE, APPEND_MODE, NONE, null, false);
 
     verify(client, times(1)).append(
         eq(PATH), any(byte[].class), refEq(firstReqParameters), any());
@@ -133,7 +134,7 @@ public final class TestAbfsOutputStream {
 
     when(client.getAbfsPerfTracker()).thenReturn(tracker);
     when(client.append(anyString(), any(byte[].class), any(AppendRequestParameters.class), any())).thenReturn(op);
-    when(client.flush(anyString(), anyLong(), anyBoolean(), anyBoolean(), any())).thenReturn(op);
+    when(client.flush(anyString(), anyLong(), anyBoolean(), anyBoolean(), any(), any())).thenReturn(op);
 
     AbfsOutputStream out = new AbfsOutputStream(client, null, PATH, 0,
         populateAbfsOutputStreamContext(BUFFER_SIZE, true, false, false));
@@ -146,9 +147,9 @@ public final class TestAbfsOutputStream {
     out.close();
 
     AppendRequestParameters firstReqParameters = new AppendRequestParameters(
-        0, 0, BUFFER_SIZE, APPEND_MODE, false);
+        0, 0, BUFFER_SIZE, APPEND_MODE, NONE, null, false);
     AppendRequestParameters secondReqParameters = new AppendRequestParameters(
-        BUFFER_SIZE, 0, 5*WRITE_SIZE-BUFFER_SIZE, APPEND_MODE, false);
+        BUFFER_SIZE, 0, 5*WRITE_SIZE-BUFFER_SIZE, APPEND_MODE, NONE, null, false);
 
     verify(client, times(1)).append(
         eq(PATH), any(byte[].class), refEq(firstReqParameters), any());
@@ -163,9 +164,10 @@ public final class TestAbfsOutputStream {
     ArgumentCaptor<Boolean> acFlushRetainUnCommittedData = ArgumentCaptor.forClass(Boolean.class);
     ArgumentCaptor<Boolean> acFlushClose = ArgumentCaptor.forClass(Boolean.class);
     ArgumentCaptor<String> acFlushSASToken = ArgumentCaptor.forClass(String.class);
+    ArgumentCaptor<String> acLeaseId = ArgumentCaptor.forClass(String.class);
 
     verify(client, times(1)).flush(acFlushPath.capture(), acFlushPosition.capture(), acFlushRetainUnCommittedData.capture(), acFlushClose.capture(),
-        acFlushSASToken.capture());
+        acFlushSASToken.capture(), acLeaseId.capture());
     assertThat(Arrays.asList(PATH)).describedAs("path").isEqualTo(acFlushPath.getAllValues());
     assertThat(Arrays.asList(Long.valueOf(5*WRITE_SIZE))).describedAs("position").isEqualTo(acFlushPosition.getAllValues());
     assertThat(Arrays.asList(false)).describedAs("RetainUnCommittedData flag").isEqualTo(acFlushRetainUnCommittedData.getAllValues());
@@ -189,7 +191,7 @@ public final class TestAbfsOutputStream {
 
     when(client.getAbfsPerfTracker()).thenReturn(tracker);
     when(client.append(anyString(), any(byte[].class), any(AppendRequestParameters.class), any())).thenReturn(op);
-    when(client.flush(anyString(), anyLong(), anyBoolean(), anyBoolean(), any())).thenReturn(op);
+    when(client.flush(anyString(), anyLong(), anyBoolean(), anyBoolean(), any(), any())).thenReturn(op);
     when(op.getSasToken()).thenReturn("testToken");
     when(op.getResult()).thenReturn(httpOp);
 
@@ -204,9 +206,9 @@ public final class TestAbfsOutputStream {
     out.close();
 
     AppendRequestParameters firstReqParameters = new AppendRequestParameters(
-        0, 0, BUFFER_SIZE, APPEND_MODE, false);
+        0, 0, BUFFER_SIZE, APPEND_MODE, NONE, null, false);
     AppendRequestParameters secondReqParameters = new AppendRequestParameters(
-        BUFFER_SIZE, 0, BUFFER_SIZE, APPEND_MODE, false);
+        BUFFER_SIZE, 0, BUFFER_SIZE, APPEND_MODE, NONE, null, false);
 
     verify(client, times(1)).append(
         eq(PATH), any(byte[].class), refEq(firstReqParameters), any());
@@ -221,9 +223,10 @@ public final class TestAbfsOutputStream {
     ArgumentCaptor<Boolean> acFlushRetainUnCommittedData = ArgumentCaptor.forClass(Boolean.class);
     ArgumentCaptor<Boolean> acFlushClose = ArgumentCaptor.forClass(Boolean.class);
     ArgumentCaptor<String> acFlushSASToken = ArgumentCaptor.forClass(String.class);
+    ArgumentCaptor<String> acLeaseId = ArgumentCaptor.forClass(String.class);
 
     verify(client, times(1)).flush(acFlushPath.capture(), acFlushPosition.capture(), acFlushRetainUnCommittedData.capture(), acFlushClose.capture(),
-        acFlushSASToken.capture());
+        acFlushSASToken.capture(), acLeaseId.capture());
     assertThat(Arrays.asList(PATH)).describedAs("path").isEqualTo(acFlushPath.getAllValues());
     assertThat(Arrays.asList(Long.valueOf(2*BUFFER_SIZE))).describedAs("position").isEqualTo(acFlushPosition.getAllValues());
     assertThat(Arrays.asList(false)).describedAs("RetainUnCommittedData flag").isEqualTo(acFlushRetainUnCommittedData.getAllValues());
@@ -247,7 +250,7 @@ public final class TestAbfsOutputStream {
 
     when(client.getAbfsPerfTracker()).thenReturn(tracker);
     when(client.append(anyString(), any(byte[].class), any(AppendRequestParameters.class), any())).thenReturn(op);
-    when(client.flush(anyString(), anyLong(), anyBoolean(), anyBoolean(), any())).thenReturn(op);
+    when(client.flush(anyString(), anyLong(), anyBoolean(), anyBoolean(), any(), any())).thenReturn(op);
     when(op.getSasToken()).thenReturn("testToken");
     when(op.getResult()).thenReturn(httpOp);
 
@@ -262,9 +265,9 @@ public final class TestAbfsOutputStream {
     Thread.sleep(1000);
 
     AppendRequestParameters firstReqParameters = new AppendRequestParameters(
-        0, 0, BUFFER_SIZE, APPEND_MODE, false);
+        0, 0, BUFFER_SIZE, APPEND_MODE, NONE, null, false);
     AppendRequestParameters secondReqParameters = new AppendRequestParameters(
-        BUFFER_SIZE, 0, BUFFER_SIZE, APPEND_MODE, false);
+        BUFFER_SIZE, 0, BUFFER_SIZE, APPEND_MODE, NONE, null, false);
 
     verify(client, times(1)).append(
         eq(PATH), any(byte[].class), refEq(firstReqParameters), any());
@@ -291,7 +294,7 @@ public final class TestAbfsOutputStream {
 
     when(client.getAbfsPerfTracker()).thenReturn(tracker);
     when(client.append(anyString(), any(byte[].class), any(AppendRequestParameters.class), any())).thenReturn(op);
-    when(client.flush(anyString(), anyLong(), anyBoolean(), anyBoolean(), any())).thenReturn(op);
+    when(client.flush(anyString(), anyLong(), anyBoolean(), anyBoolean(), any(), any())).thenReturn(op);
 
     AbfsOutputStream out = new AbfsOutputStream(client, null, PATH, 0,
         populateAbfsOutputStreamContext(BUFFER_SIZE, true, false, true));
@@ -304,9 +307,9 @@ public final class TestAbfsOutputStream {
     Thread.sleep(1000);
 
     AppendRequestParameters firstReqParameters = new AppendRequestParameters(
-        0, 0, BUFFER_SIZE, APPEND_MODE, true);
+        0, 0, BUFFER_SIZE, APPEND_MODE, NONE, null, true);
     AppendRequestParameters secondReqParameters = new AppendRequestParameters(
-        BUFFER_SIZE, 0, BUFFER_SIZE, APPEND_MODE, true);
+        BUFFER_SIZE, 0, BUFFER_SIZE, APPEND_MODE, NONE, null, true);
 
     verify(client, times(1)).append(
         eq(PATH), any(byte[].class), refEq(firstReqParameters), any());
@@ -334,7 +337,7 @@ public final class TestAbfsOutputStream {
 
     when(client.getAbfsPerfTracker()).thenReturn(tracker);
     when(client.append(anyString(), any(byte[].class), any(AppendRequestParameters.class), any())).thenReturn(op);
-    when(client.flush(anyString(), anyLong(), anyBoolean(), anyBoolean(), any())).thenReturn(op);
+    when(client.flush(anyString(), anyLong(), anyBoolean(), anyBoolean(), any(), any())).thenReturn(op);
 
     AbfsOutputStream out = new AbfsOutputStream(client, null, PATH, 0,
         populateAbfsOutputStreamContext(BUFFER_SIZE, true, false, false));
@@ -347,9 +350,9 @@ public final class TestAbfsOutputStream {
     out.hflush();
 
     AppendRequestParameters firstReqParameters = new AppendRequestParameters(
-        0, 0, BUFFER_SIZE, APPEND_MODE, false);
+        0, 0, BUFFER_SIZE, APPEND_MODE, NONE, null, false);
     AppendRequestParameters secondReqParameters = new AppendRequestParameters(
-        BUFFER_SIZE, 0, BUFFER_SIZE, APPEND_MODE, false);
+        BUFFER_SIZE, 0, BUFFER_SIZE, APPEND_MODE, NONE, null, false);
 
     verify(client, times(1)).append(
         eq(PATH), any(byte[].class), refEq(firstReqParameters), any());
@@ -364,9 +367,10 @@ public final class TestAbfsOutputStream {
     ArgumentCaptor<Boolean> acFlushRetainUnCommittedData = ArgumentCaptor.forClass(Boolean.class);
     ArgumentCaptor<Boolean> acFlushClose = ArgumentCaptor.forClass(Boolean.class);
     ArgumentCaptor<String> acFlushSASToken = ArgumentCaptor.forClass(String.class);
+    ArgumentCaptor<String> acFlushLeaseId= ArgumentCaptor.forClass(String.class);
 
     verify(client, times(1)).flush(acFlushPath.capture(), acFlushPosition.capture(), acFlushRetainUnCommittedData.capture(), acFlushClose.capture(),
-        acFlushSASToken.capture());
+        acFlushSASToken.capture(), acFlushLeaseId.capture());
     assertThat(Arrays.asList(PATH)).describedAs("path").isEqualTo(acFlushPath.getAllValues());
     assertThat(Arrays.asList(Long.valueOf(2*BUFFER_SIZE))).describedAs("position").isEqualTo(acFlushPosition.getAllValues());
     assertThat(Arrays.asList(false)).describedAs("RetainUnCommittedData flag").isEqualTo(acFlushRetainUnCommittedData.getAllValues());
@@ -388,7 +392,7 @@ public final class TestAbfsOutputStream {
     AbfsPerfTracker tracker = new AbfsPerfTracker("test", accountName1, abfsConf);
     when(client.getAbfsPerfTracker()).thenReturn(tracker);
     when(client.append(anyString(), any(byte[].class), any(AppendRequestParameters.class), any())).thenReturn(op);
-    when(client.flush(anyString(), anyLong(), anyBoolean(), anyBoolean(), any())).thenReturn(op);
+    when(client.flush(anyString(), anyLong(), anyBoolean(), anyBoolean(), any(), any())).thenReturn(op);
 
     AbfsOutputStream out = new AbfsOutputStream(client, null, PATH, 0,
         populateAbfsOutputStreamContext(BUFFER_SIZE, true, false, false));
@@ -403,9 +407,9 @@ public final class TestAbfsOutputStream {
     Thread.sleep(1000);
 
     AppendRequestParameters firstReqParameters = new AppendRequestParameters(
-        0, 0, BUFFER_SIZE, APPEND_MODE, false);
+        0, 0, BUFFER_SIZE, APPEND_MODE, NONE, null, false);
     AppendRequestParameters secondReqParameters = new AppendRequestParameters(
-        BUFFER_SIZE, 0, BUFFER_SIZE, APPEND_MODE, false);
+        BUFFER_SIZE, 0, BUFFER_SIZE, APPEND_MODE, NONE, null, false);
 
     verify(client, times(1)).append(
         eq(PATH), any(byte[].class), refEq(firstReqParameters), any());

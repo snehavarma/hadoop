@@ -28,21 +28,34 @@ public class AppendRequestParameters {
     FLUSH_CLOSE_MODE
   }
 
+  public enum LeaseMode {
+    NONE,
+    ACQUIRE,
+    AUTO_RENEW,
+    RELEASE
+  }
+
   private final long position;
   private final int offset;
   private final int length;
   private final Mode mode;
   private final boolean isAppendBlob;
+  private final LeaseMode leaseMode;
+  private final String leaseId;
 
   public AppendRequestParameters(final long position,
       final int offset,
       final int length,
       final Mode mode,
+      final LeaseMode leaseMode,
+      final String leaseId,
       final boolean isAppendBlob) {
     this.position = position;
     this.offset = offset;
     this.length = length;
     this.mode = mode;
+    this.leaseMode = leaseMode;
+    this.leaseId = leaseId;
     this.isAppendBlob = isAppendBlob;
   }
 
@@ -66,4 +79,11 @@ public class AppendRequestParameters {
     return this.isAppendBlob;
   }
 
+  public LeaseMode getLeaseMode() {
+    return this.leaseMode;
+  }
+
+  public String getLeaseId() {
+    return this.leaseId;
+  }
 }

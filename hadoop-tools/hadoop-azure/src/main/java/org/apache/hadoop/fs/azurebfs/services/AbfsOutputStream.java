@@ -24,6 +24,7 @@ import java.io.InterruptedIOException;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.nio.ByteBuffer;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ExecutorCompletionService;
@@ -73,6 +74,8 @@ public class AbfsOutputStream extends OutputStream implements Syncable,
   private boolean disableOutputStreamFlush;
   private boolean enableSmallWriteOptimization;
   private boolean isAppendBlob;
+  private boolean isLeaseAcquired;
+  private boolean isLeaseEnforced;
   private volatile IOException lastError;
 
   private long lastFlushOffset;
@@ -82,8 +85,10 @@ public class AbfsOutputStream extends OutputStream implements Syncable,
   private byte[] buffer;
   private int bufferIndex;
   private int numOfAppendsToServerSinceLastFlush;
+  private int numOfAppends;
   private final int maxConcurrentRequestCount;
   private final int maxRequestsThatCanBeQueued;
+  private String leaseId;
 
   private ConcurrentLinkedDeque<WriteOperation> writeOperations;
   private final ThreadPoolExecutor threadExecutor;
@@ -130,9 +135,13 @@ public class AbfsOutputStream extends OutputStream implements Syncable,
     this.bufferSize = abfsOutputStreamContext.getWriteBufferSize();
     this.buffer = byteBufferPool.getBuffer(false, bufferSize).array();
     this.bufferIndex = 0;
+    this.numOfAppends = 0;
     this.numOfAppendsToServerSinceLastFlush = 0;
     this.writeOperations = new ConcurrentLinkedDeque<>();
     this.outputStreamStatistics = abfsOutputStreamContext.getStreamStatistics();
+    this.leaseId = abfsOutputStreamContext.getLeaseID();
+    this.isLeaseAcquired = abfsOutputStreamContext.isLeaseAcquired();
+    this.isLeaseEnforced = abfsOutputStreamContext.isEnableLeaseEnforcement();
 
     if (this.isAppendBlob) {
       this.maxConcurrentRequestCount = 1;
@@ -371,8 +380,22 @@ public class AbfsOutputStream extends OutputStream implements Syncable,
     AbfsPerfTracker tracker = client.getAbfsPerfTracker();
     try (AbfsPerfInfo perfInfo = new AbfsPerfInfo(tracker,
             "writeCurrentBufferToService", "append")) {
+      AppendRequestParameters.LeaseMode leaseAction = AppendRequestParameters.LeaseMode.NONE;
+
+      if (isLeaseEnforced) {
+        if (numOfAppends == 1 && !isLeaseAcquired ) {
+          leaseAction = AppendRequestParameters.LeaseMode.ACQUIRE;
+        } else {
+          leaseAction = AppendRequestParameters.LeaseMode.AUTO_RENEW;
+        }
+
+        if (leaseId == null || leaseId.isEmpty()) {
+          leaseId = UUID.randomUUID().toString();
+        }
+      }
+
       AppendRequestParameters reqParams = new AppendRequestParameters(offset, 0,
-          bytesLength, APPEND_MODE, true);
+          bytesLength, APPEND_MODE, leaseAction, leaseId, true);
       AbfsRestOperation op = client.append(path, bytes, reqParams, cachedSasToken.get());
       cachedSasToken.update(op.getSasToken());
       if (outputStreamStatistics != null) {
@@ -401,6 +424,7 @@ public class AbfsOutputStream extends OutputStream implements Syncable,
   }
 
   private synchronized void writeCurrentBufferToService(boolean isFlush, boolean isClose) throws IOException {
+    numOfAppends ++;
     if (this.isAppendBlob) {
       writeAppendBlobCurrentBufferToService();
       return;
@@ -447,8 +471,29 @@ public class AbfsOutputStream extends OutputStream implements Syncable,
                     } else if (isFlush) {
                       mode = FLUSH_MODE;
                     }
+
+                    AppendRequestParameters.LeaseMode leaseAction = AppendRequestParameters.LeaseMode.NONE;
+
+                    if (isLeaseEnforced) {
+                      if (numOfAppends == 1 && !isLeaseAcquired && mode != AppendRequestParameters.Mode.FLUSH_CLOSE_MODE) {
+                        leaseAction = AppendRequestParameters.LeaseMode.ACQUIRE;
+                      } else if (!(numOfAppends == 1 && !isLeaseAcquired && mode != AppendRequestParameters.Mode.FLUSH_CLOSE_MODE)) {
+                        //Do not add any lease header as it is first call & flush with close also needs to be called in the same call.
+                      } else {
+                        if (mode == AppendRequestParameters.Mode.FLUSH_CLOSE_MODE) {
+                          leaseAction = AppendRequestParameters.LeaseMode.RELEASE;
+                        } else {
+                          leaseAction = AppendRequestParameters.LeaseMode.AUTO_RENEW;
+                        }
+                      }
+
+                      if (leaseId == null || leaseId.isEmpty()) {
+                        leaseId = UUID.randomUUID().toString();
+                      }
+                    }
+
                     AppendRequestParameters reqParams = new AppendRequestParameters(
-                        offset, 0, bytesLength, mode, false);
+                        offset, 0, bytesLength, mode, leaseAction, leaseId, false);
                     AbfsRestOperation op = client.append(path, bytes, reqParams,
                         cachedSasToken.get());
                     cachedSasToken.update(op.getSasToken());
@@ -517,7 +562,7 @@ public class AbfsOutputStream extends OutputStream implements Syncable,
     AbfsPerfTracker tracker = client.getAbfsPerfTracker();
     try (AbfsPerfInfo perfInfo = new AbfsPerfInfo(tracker,
             "flushWrittenBytesToServiceInternal", "flush")) {
-      AbfsRestOperation op = client.flush(path, offset, retainUncommitedData, isClose, cachedSasToken.get());
+      AbfsRestOperation op = client.flush(path, offset, retainUncommitedData, isClose, cachedSasToken.get(), leaseId);
       cachedSasToken.update(op.getSasToken());
       perfInfo.registerResult(op.getResult()).registerSuccess(true);
     } catch (AzureBlobFileSystemException ex) {

@@ -47,6 +47,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 import org.apache.hadoop.thirdparty.com.google.common.annotations.VisibleForTesting;
 import org.apache.hadoop.thirdparty.com.google.common.base.Preconditions;
@@ -466,6 +467,11 @@ public class AzureBlobFileSystemStore implements Closeable, ListingSupport {
         isAppendBlob = true;
       }
 
+      String leaseId = null;
+      if (abfsConfiguration.isLeaseEnforced()) {
+        leaseId = UUID.randomUUID().toString();
+      }
+
       // if "fs.azure.enable.conditional.create.overwrite" is enabled and
       // is a create request with overwrite=true, create will follow different
       // flow.
@@ -481,7 +487,8 @@ public class AzureBlobFileSystemStore implements Closeable, ListingSupport {
             statistics,
             isNamespaceEnabled ? getOctalNotation(permission) : null,
             isNamespaceEnabled ? getOctalNotation(umask) : null,
-            isAppendBlob
+            isAppendBlob,
+            leaseId
         );
 
       } else {
@@ -490,7 +497,8 @@ public class AzureBlobFileSystemStore implements Closeable, ListingSupport {
             isNamespaceEnabled ? getOctalNotation(permission) : null,
             isNamespaceEnabled ? getOctalNotation(umask) : null,
             isAppendBlob,
-            null);
+            null,
+            leaseId);
       }
       perfInfo.registerResult(op.getResult()).registerSuccess(true);
 
@@ -499,7 +507,7 @@ public class AzureBlobFileSystemStore implements Closeable, ListingSupport {
           statistics,
           relativePath,
           0,
-          populateAbfsOutputStreamContext(isAppendBlob));
+          populateAbfsOutputStreamContext(isAppendBlob, true, leaseId));
     }
   }
 
@@ -511,6 +519,7 @@ public class AzureBlobFileSystemStore implements Closeable, ListingSupport {
    * @param permission
    * @param umask
    * @param isAppendBlob
+   * @param leaseId
    * @return
    * @throws AzureBlobFileSystemException
    */
@@ -518,7 +527,8 @@ public class AzureBlobFileSystemStore implements Closeable, ListingSupport {
       final FileSystem.Statistics statistics,
       final String permission,
       final String umask,
-      final boolean isAppendBlob) throws AzureBlobFileSystemException {
+      final boolean isAppendBlob,
+      final String leaseId) throws AzureBlobFileSystemException {
     AbfsRestOperation op;
 
     try {
@@ -526,7 +536,7 @@ public class AzureBlobFileSystemStore implements Closeable, ListingSupport {
       // avoided for cases when no pre-existing file is present (major portion
       // of create file traffic falls into the case of no pre-existing file).
       op = client.createPath(relativePath, true,
-          false, permission, umask, isAppendBlob, null);
+          false, permission, umask, isAppendBlob, null, leaseId);
     } catch (AbfsRestOperationException e) {
       if (e.getStatusCode() == HttpURLConnection.HTTP_CONFLICT) {
         // File pre-exists, fetch eTag
@@ -550,7 +560,7 @@ public class AzureBlobFileSystemStore implements Closeable, ListingSupport {
         try {
           // overwrite only if eTag matches with the file properties fetched befpre
           op = client.createPath(relativePath, true,
-              true, permission, umask, isAppendBlob, eTag);
+              true, permission, umask, isAppendBlob, eTag, leaseId);
         } catch (AbfsRestOperationException ex) {
           if (ex.getStatusCode() == HttpURLConnection.HTTP_PRECON_FAILED) {
             // Is a parallel access case, as file with eTag was just queried
@@ -571,7 +581,7 @@ public class AzureBlobFileSystemStore implements Closeable, ListingSupport {
     return op;
   }
 
-  private AbfsOutputStreamContext populateAbfsOutputStreamContext(boolean isAppendBlob) {
+  private AbfsOutputStreamContext populateAbfsOutputStreamContext(boolean isAppendBlob, boolean isLeaseAcquired, String leaseId) {
     int bufferSize = abfsConfiguration.getWriteBufferSize();
     if (isAppendBlob && bufferSize > FileSystemConfigurations.APPENDBLOB_MAX_WRITE_BUFFER_SIZE) {
       bufferSize = FileSystemConfigurations.APPENDBLOB_MAX_WRITE_BUFFER_SIZE;
@@ -579,10 +589,12 @@ public class AzureBlobFileSystemStore implements Closeable, ListingSupport {
     return new AbfsOutputStreamContext(abfsConfiguration.getSasTokenRenewPeriodForStreamsInSeconds())
             .withWriteBufferSize(bufferSize)
             .enableFlush(abfsConfiguration.isFlushEnabled())
+            .enableLeaseEnforcement(abfsConfiguration.isLeaseEnforced())
             .enableSmallWriteOptimization(abfsConfiguration.isSmallWriteOptimizationEnabled())
             .disableOutputStreamFlush(abfsConfiguration.isOutputStreamFlushDisabled())
             .withStreamStatistics(new AbfsOutputStreamStatisticsImpl())
             .withAppendBlob(isAppendBlob)
+            .withLeaseId(leaseId)
             .withWriteMaxConcurrentRequestCount(abfsConfiguration.getWriteMaxConcurrentRequestCount())
             .withMaxWriteRequestsToQueue(abfsConfiguration.getMaxWriteRequestsToQueue())
             .build();
@@ -601,7 +613,7 @@ public class AzureBlobFileSystemStore implements Closeable, ListingSupport {
 
       final AbfsRestOperation op = client.createPath(getRelativePath(path), false, true,
               isNamespaceEnabled ? getOctalNotation(permission) : null,
-              isNamespaceEnabled ? getOctalNotation(umask) : null, false, null);
+              isNamespaceEnabled ? getOctalNotation(umask) : null, false, null, null);
       perfInfo.registerResult(op.getResult()).registerSuccess(true);
     }
   }
@@ -687,12 +699,17 @@ public class AzureBlobFileSystemStore implements Closeable, ListingSupport {
         isAppendBlob = true;
       }
 
+      String leaseId = null;
+      if (abfsConfiguration.isLeaseEnforced()) {
+        leaseId = UUID.randomUUID().toString();
+      }
+
       return new AbfsOutputStream(
           client,
           statistics,
           relativePath,
           offset,
-          populateAbfsOutputStreamContext(isAppendBlob));
+          populateAbfsOutputStreamContext(isAppendBlob, false, leaseId));
     }
   }
 

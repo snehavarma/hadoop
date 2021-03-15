@@ -27,6 +27,8 @@ public class AbfsOutputStreamContext extends AbfsStreamContext {
 
   private boolean enableFlush;
 
+  private boolean enableLeaseEnforcement;
+
   private boolean enableSmallWriteOptimization;
 
   private boolean disableOutputStreamFlush;
@@ -35,9 +37,13 @@ public class AbfsOutputStreamContext extends AbfsStreamContext {
 
   private boolean isAppendBlob;
 
+  private boolean isLeaseAcquired;
+
   private int writeMaxConcurrentRequestCount;
 
   private int maxWriteRequestsToQueue;
+
+  private String leaseId;
 
   public AbfsOutputStreamContext(final long sasTokenRenewPeriodForStreamsInSeconds) {
     super(sasTokenRenewPeriodForStreamsInSeconds);
@@ -49,8 +55,19 @@ public class AbfsOutputStreamContext extends AbfsStreamContext {
     return this;
   }
 
+  public AbfsOutputStreamContext withLeaseId(
+          final String leaseId) {
+    this.leaseId = leaseId;
+    return this;
+  }
+
   public AbfsOutputStreamContext enableFlush(final boolean enableFlush) {
     this.enableFlush = enableFlush;
+    return this;
+  }
+
+  public AbfsOutputStreamContext enableLeaseEnforcement(final boolean enableLeaseEnforcement) {
+    this.enableLeaseEnforcement = enableLeaseEnforcement;
     return this;
   }
 
@@ -74,6 +91,12 @@ public class AbfsOutputStreamContext extends AbfsStreamContext {
   public AbfsOutputStreamContext withAppendBlob(
           final boolean isAppendBlob) {
     this.isAppendBlob = isAppendBlob;
+    return this;
+  }
+
+  public AbfsOutputStreamContext withLeaseAcquired(
+          final boolean isLeaseAcquired) {
+    this.isLeaseAcquired = isLeaseAcquired;
     return this;
   }
 
@@ -102,6 +125,10 @@ public class AbfsOutputStreamContext extends AbfsStreamContext {
     return enableFlush;
   }
 
+  public boolean isEnableLeaseEnforcement() {
+    return enableLeaseEnforcement;
+  }
+
   public boolean isDisableOutputStreamFlush() {
     return disableOutputStreamFlush;
   }
@@ -114,6 +141,10 @@ public class AbfsOutputStreamContext extends AbfsStreamContext {
     return isAppendBlob;
   }
 
+  public String getLeaseID() {
+    return this.leaseId;
+  }
+
   public int getWriteMaxConcurrentRequestCount() {
     return this.writeMaxConcurrentRequestCount;
   }
@@ -124,5 +155,9 @@ public class AbfsOutputStreamContext extends AbfsStreamContext {
 
   public boolean isEnableSmallWriteOptimization() {
     return this.enableSmallWriteOptimization;
+  }
+
+  public boolean isLeaseAcquired() {
+    return this.isLeaseAcquired;
   }
 }

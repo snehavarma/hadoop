@@ -36,6 +36,10 @@ import org.apache.hadoop.fs.azurebfs.contracts.exceptions.InvalidAbfsRestOperati
 import org.apache.hadoop.fs.azurebfs.constants.HttpHeaderConfigurations;
 import org.apache.hadoop.fs.azurebfs.oauth2.AzureADAuthenticator.HttpException;
 
+import static org.apache.hadoop.fs.azurebfs.constants.AbfsHttpConstants.ACQUIRE;
+import static org.apache.hadoop.fs.azurebfs.constants.AbfsHttpConstants.AUTO_RENEW;
+import static org.apache.hadoop.fs.azurebfs.constants.HttpHeaderConfigurations.X_MS_LEASE_ID;
+
 /**
  * The AbfsRestOperation for Rest AbfsClient.
  */
@@ -67,8 +71,13 @@ public class AbfsRestOperation {
   private int bufferLength;
   private int retryCount = 0;
 
+  private int leaseDuration = 0;
+  private boolean acquireLease = false;
+  private boolean requestHeaderUpdated = false;
+
   private AbfsHttpOperation result;
   private AbfsCounters abfsCounters;
+
 
   public AbfsHttpOperation getResult() {
     return result;
@@ -211,6 +220,10 @@ public class AbfsRestOperation {
     AbfsHttpOperation httpOperation = null;
     try {
       // initialize the HTTP request and open the connection
+      if (acquireLease && !requestHeaderUpdated) {
+        UpdateRequestHeaders();
+      }
+
       httpOperation = new AbfsHttpOperation(url, method, requestHeaders);
       incrementCounter(AbfsStatistic.CONNECTIONS_MADE, 1);
 
@@ -296,6 +309,17 @@ public class AbfsRestOperation {
       return false;
     }
 
+    if (client.getRetryPolicy().isRetriableDueToLease(retryCount, httpOperation.getStatusCode(), operationType)) {
+
+      // first try simple retrial of the request
+      // if that doesnt work then acquire lease
+      if (retryCount == 2) {
+        acquireLease = true;
+      }
+
+      return false;
+    }
+
     result = httpOperation;
 
     return true;
@@ -310,6 +334,27 @@ public class AbfsRestOperation {
   private void incrementCounter(AbfsStatistic statistic, long value) {
     if (abfsCounters != null) {
       abfsCounters.incrementCounter(statistic, value);
+    }
+  }
+
+  private void UpdateRequestHeaders() {
+    requestHeaderUpdated = true;
+
+    if (!requestHeaders.contains(new AbfsHttpHeader(HttpHeaderConfigurations.X_MS_LEASE_ACTION, AUTO_RENEW))) {
+      return;
+    }
+
+    String leaseId;
+    for (int i = 0; i < requestHeaders.size(); i++) {
+      if (requestHeaders.get(i).getName() == X_MS_LEASE_ID) {
+        leaseId = requestHeaders.get(i).getValue();
+        requestHeaders.remove(i);
+        requestHeaders.remove(new AbfsHttpHeader(HttpHeaderConfigurations.X_MS_LEASE_ACTION, AUTO_RENEW));
+        requestHeaders.add(new AbfsHttpHeader(HttpHeaderConfigurations.X_MS_LEASE_ACTION, ACQUIRE));
+        requestHeaders.add(new AbfsHttpHeader(HttpHeaderConfigurations.X_MS_PROPOSED_LEASE_ID, leaseId));
+        requestHeaders.add(new AbfsHttpHeader(HttpHeaderConfigurations.X_MS_LEASE_DURATION, String.valueOf(leaseDuration)));
+        break;
+      }
     }
   }
 }

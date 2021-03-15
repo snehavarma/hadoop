@@ -78,6 +78,8 @@ public final class ConfigurationKeys {
   public static final String FS_AZURE_ENABLE_AUTOTHROTTLING = "fs.azure.enable.autothrottling";
   public static final String FS_AZURE_ALWAYS_USE_HTTPS = "fs.azure.always.use.https";
   public static final String FS_AZURE_ATOMIC_RENAME_KEY = "fs.azure.atomic.rename.key";
+  public static final String FS_AZURE_WRITE_ENFORCE_LEASE = "fs.azure.write.enforcelease";
+  public static final String FS_AZURE_WRITE_LEASE_DURATION = "fs.azure.write.lease.duration";
   /** This config ensures that during create overwrite an existing file will be
    *  overwritten only if there is a match on the eTag of existing file.
    */
