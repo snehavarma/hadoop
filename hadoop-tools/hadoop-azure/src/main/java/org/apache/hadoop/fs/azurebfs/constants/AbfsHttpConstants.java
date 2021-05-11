@@ -45,6 +45,7 @@ public final class AbfsHttpConstants {
 
   public static final String RELEASE = "release";
   public static final String ACQUIRE = "acquire";
+  public static final String ACQUIRE_RELEASE = "acquire-release";
   public static final String AUTO_RENEW = "auto-renew";
 
 

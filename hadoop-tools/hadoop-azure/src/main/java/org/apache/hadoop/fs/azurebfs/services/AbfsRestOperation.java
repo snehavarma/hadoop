@@ -36,8 +36,7 @@ import org.apache.hadoop.fs.azurebfs.contracts.exceptions.InvalidAbfsRestOperati
 import org.apache.hadoop.fs.azurebfs.constants.HttpHeaderConfigurations;
 import org.apache.hadoop.fs.azurebfs.oauth2.AzureADAuthenticator.HttpException;
 
-import static org.apache.hadoop.fs.azurebfs.constants.AbfsHttpConstants.ACQUIRE;
-import static org.apache.hadoop.fs.azurebfs.constants.AbfsHttpConstants.AUTO_RENEW;
+import static org.apache.hadoop.fs.azurebfs.constants.AbfsHttpConstants.*;
 import static org.apache.hadoop.fs.azurebfs.constants.HttpHeaderConfigurations.X_MS_LEASE_ID;
 
 /**
@@ -340,17 +339,20 @@ public class AbfsRestOperation {
   private void UpdateRequestHeaders() {
     requestHeaderUpdated = true;
 
-    if (!requestHeaders.contains(new AbfsHttpHeader(HttpHeaderConfigurations.X_MS_LEASE_ACTION, AUTO_RENEW))) {
+    if (!requestHeaders.contains(new AbfsHttpHeader(HttpHeaderConfigurations.X_MS_LEASE_ACTION, AUTO_RENEW))
+            && !requestHeaders.contains(new AbfsHttpHeader(HttpHeaderConfigurations.X_MS_LEASE_ACTION, RELEASE))) {
       return;
     }
+
+    boolean containsAutoRenew = requestHeaders.contains(new AbfsHttpHeader(HttpHeaderConfigurations.X_MS_LEASE_ACTION, AUTO_RENEW));
 
     String leaseId;
     for (int i = 0; i < requestHeaders.size(); i++) {
       if (requestHeaders.get(i).getName() == X_MS_LEASE_ID) {
         leaseId = requestHeaders.get(i).getValue();
         requestHeaders.remove(i);
-        requestHeaders.remove(new AbfsHttpHeader(HttpHeaderConfigurations.X_MS_LEASE_ACTION, AUTO_RENEW));
-        requestHeaders.add(new AbfsHttpHeader(HttpHeaderConfigurations.X_MS_LEASE_ACTION, ACQUIRE));
+        requestHeaders.remove(new AbfsHttpHeader(HttpHeaderConfigurations.X_MS_LEASE_ACTION, containsAutoRenew ? AUTO_RENEW : RELEASE));
+        requestHeaders.add(new AbfsHttpHeader(HttpHeaderConfigurations.X_MS_LEASE_ACTION, containsAutoRenew ? ACQUIRE : ACQUIRE_RELEASE));
         requestHeaders.add(new AbfsHttpHeader(HttpHeaderConfigurations.X_MS_PROPOSED_LEASE_ID, leaseId));
         requestHeaders.add(new AbfsHttpHeader(HttpHeaderConfigurations.X_MS_LEASE_DURATION, String.valueOf(leaseDuration)));
         break;

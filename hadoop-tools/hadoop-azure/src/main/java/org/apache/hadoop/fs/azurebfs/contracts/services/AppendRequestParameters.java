@@ -32,6 +32,7 @@ public class AppendRequestParameters {
     NONE,
     ACQUIRE,
     AUTO_RENEW,
+    ACQUIRE_RELEASE,
     RELEASE
   }
 

@@ -425,8 +425,8 @@ public class AbfsClient implements Closeable {
     }
 
     if (abfsConfiguration.isLeaseEnforced() && reqParams.getLeaseMode() != AppendRequestParameters.LeaseMode.NONE && reqParams.getLeaseId() != null && !reqParams.getLeaseId().isEmpty()) {
-      if (reqParams.getLeaseMode() == AppendRequestParameters.LeaseMode.ACQUIRE) {
-        requestHeaders.add(new AbfsHttpHeader(HttpHeaderConfigurations.X_MS_LEASE_ACTION, ACQUIRE));
+      if (reqParams.getLeaseMode() == AppendRequestParameters.LeaseMode.ACQUIRE || reqParams.getLeaseMode() == AppendRequestParameters.LeaseMode.ACQUIRE_RELEASE) {
+        requestHeaders.add(new AbfsHttpHeader(HttpHeaderConfigurations.X_MS_LEASE_ACTION, reqParams.getLeaseMode() == AppendRequestParameters.LeaseMode.ACQUIRE ? ACQUIRE : ACQUIRE_RELEASE));
         requestHeaders.add(new AbfsHttpHeader(HttpHeaderConfigurations.X_MS_PROPOSED_LEASE_ID, reqParams.getLeaseId()));
         requestHeaders.add(new AbfsHttpHeader(HttpHeaderConfigurations.X_MS_LEASE_DURATION, String.valueOf(abfsConfiguration.getWriteLeaseDuration())));
       } else if (reqParams.getLeaseMode() == AppendRequestParameters.LeaseMode.AUTO_RENEW)
@@ -457,18 +457,6 @@ public class AbfsClient implements Closeable {
     try {
       op.execute();
     } catch (AzureBlobFileSystemException e) {
-
-      if (reqParams.getLeaseMode() == AppendRequestParameters.LeaseMode.RELEASE
-      && (op.getResult().getStatusCode() == HttpURLConnection.HTTP_PRECON_FAILED
-              || op.getResult().getStatusCode() == HttpURLConnection.HTTP_CONFLICT)) {
-
-        AbfsRestOperation acquireOp = acquireLease(path, sasTokenForReuse, reqParams.getLeaseId());
-
-        if (acquireOp.getResult().getStatusCode() == HttpURLConnection.HTTP_OK) {
-          return append(path, buffer, reqParams, sasTokenForReuse );
-        }
-      }
-
       if (reqParams.isAppendBlob()
           && appendSuccessCheckOp(op, path,
           (reqParams.getPosition() + reqParams.getLength()))) {
@@ -528,6 +516,10 @@ public class AbfsClient implements Closeable {
          if (isClose) {
            requestHeaders.add(new AbfsHttpHeader(X_MS_LEASE_ACTION, RELEASE));
          }
+         else
+         {
+           requestHeaders.add(new AbfsHttpHeader(X_MS_LEASE_ACTION, AUTO_RENEW));
+         }
     }
 
     final AbfsUriQueryBuilder abfsUriQueryBuilder = createDefaultUriQueryBuilder();
@@ -546,21 +538,7 @@ public class AbfsClient implements Closeable {
             HTTP_METHOD_PUT,
             url,
             requestHeaders, sasTokenForReuse);
-    try {
-      op.execute();
-    }catch (AzureBlobFileSystemException e) {
-      if (op.getResult().getStatusCode() == HttpURLConnection.HTTP_PRECON_FAILED
-      || op.getResult().getStatusCode() == HttpURLConnection.HTTP_CONFLICT) {
-
-        AbfsRestOperation acquireOp = acquireLease(path, sasTokenForReuse, leaseId);
-
-        if (acquireOp.getResult().getStatusCode() == HttpURLConnection.HTTP_OK) {
-          return flush(path, position, retainUncommittedData, isClose, sasTokenForReuse, leaseId);
-        }
-      }
-      throw e;
-    }
-
+    op.execute();
     return op;
   }
 

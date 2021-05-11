@@ -128,6 +128,7 @@ public class ExponentialRetryPolicy {
    *
    * @param retryCount The current retry attempt count.
    * @param statusCode The status code of the response, or -1 for socket error.
+   * @param abfsRestOperationType The current operation type.
    * @return true if the request should be retried; false otherwise.
    */
   public boolean isRetriableDueToLease(final int retryCount, final int statusCode, final AbfsRestOperationType abfsRestOperationType) {

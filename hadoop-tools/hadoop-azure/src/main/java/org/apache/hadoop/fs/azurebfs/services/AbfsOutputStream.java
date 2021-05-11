@@ -478,7 +478,7 @@ public class AbfsOutputStream extends OutputStream implements Syncable,
                       if (numOfAppends == 1 && !isLeaseAcquired && mode != AppendRequestParameters.Mode.FLUSH_CLOSE_MODE) {
                         leaseAction = AppendRequestParameters.LeaseMode.ACQUIRE;
                       } else if (!(numOfAppends == 1 && !isLeaseAcquired && mode != AppendRequestParameters.Mode.FLUSH_CLOSE_MODE)) {
-                        //Do not add any lease header as it is first call & flush with close also needs to be called in the same call.
+                        leaseAction = AppendRequestParameters.LeaseMode.ACQUIRE_RELEASE;
                       } else {
                         if (mode == AppendRequestParameters.Mode.FLUSH_CLOSE_MODE) {
                           leaseAction = AppendRequestParameters.LeaseMode.RELEASE;
